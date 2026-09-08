@@ -1,0 +1,20 @@
+[project]
+name = "ai-sre-incident-triage-agent"
+version = "0.1.0"
+description = "Agentic AI system for incident investigation and controlled response"
+requires-python = ">=3.11"
+
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "langchain",
+    "langgraph",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "httpx",
+]
