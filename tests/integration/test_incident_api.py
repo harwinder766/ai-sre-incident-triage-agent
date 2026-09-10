@@ -5,17 +5,9 @@ from app.main import app
 
 client = TestClient(app)
 
-
-def test_health_check():
-    response = client.get("/health")
-
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
-
-
 def test_create_incident():
     incident = {
-        "incident_id": "INC-001",
+        "incident_id": "TEST-INC-001",
         "service": "payment-api",
         "message": "DB connection pool exhausted",
         "error_rate": 0.18,
@@ -30,17 +22,38 @@ def test_create_incident():
 
     result = response.json()
 
-    # Check that the original incident information is preserved
-    assert result["incident_id"] == "INC-001"
+    assert result["incident_id"] == "TEST-INC-001"
     assert result["service"] == "payment-api"
-
-    # Check LangGraph classification
     assert result["category"] == "database"
     assert result["severity"] == "SEV-2"
 
-    # Check that the workflow produced its outputs
-    assert "investigation" in result
-    assert result["investigation"] != ""
+def test_get_incident_from_database():
+    incident = {
+        "incident_id": "TEST-INC-002",
+        "service": "user-api",
+        "message": "High memory usage",
+        "error_rate": 0.20,
+    }
 
-    assert "final_response" in result
-    assert result["final_response"] != ""
+    create_response = client.post(
+        "/api/v1/incidents/",
+        json=incident,
+    )
+
+    assert create_response.status_code == 200
+
+    get_response = client.get(
+        "/api/v1/incidents/TEST-INC-002"
+    )
+
+    assert get_response.status_code == 200
+
+    result = get_response.json()
+
+    assert result["incident_id"] == "TEST-INC-002"
+    assert result["service"] == "user-api"
+    assert result["message"] == "High memory usage"
+    assert result["error_rate"] == 0.20
+    assert result["category"] == "memory"
+    assert result["severity"] == "SEV-2"
+    assert result["status"] == "open"

@@ -1,7 +1,10 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.graph.graph import graph
+from app.db.database import get_db
+from app.db.repository import IncidentRepository
 
 
 # Create an API router
@@ -16,10 +19,10 @@ class IncidentRequest(BaseModel):
     service: str
     message: str
     error_rate: float = 0.0
-
+    
 
 @router.post("/")
-def create_incident(incident: IncidentRequest):
+def create_incident(incident: IncidentRequest, db: Session =Depends(get_db)):
     """
     Receive an incident and send it to the LangGraph workflow.
     """
@@ -34,6 +37,42 @@ def create_incident(incident: IncidentRequest):
     # Run the LangGraph workflow
     result = graph.invoke(initial_state)
 
+    repository = IncidentRepository(db)
+
+    repository.create_incident(result)
+
     # Return the workflow result as JSON
     return result
+
+@router.get("/{incident_id}")
+def get_incident(
+    incident_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Retrieve an incident from PostgreSQL.
+    """
+
+    repository = IncidentRepository(db)
+
+    incident = repository.get_incident(incident_id)
+
+    if incident is None:
+        return {"error": "Incident not found"}
+
+    return {
+        "incident_id": incident.incident_id,
+        "service": incident.service,
+        "message": incident.message,
+        "error_rate": incident.error_rate,
+        "category": incident.category,
+        "severity": incident.severity,
+        "investigation": incident.investigation,
+        "root_cause": incident.root_cause,
+        "confidence": incident.confidence,
+        "remediation": incident.remediation,
+        "status": incident.status,
+        "created_at": incident.created_at,
+        "updated_at": incident.updated_at,
+    }
 
