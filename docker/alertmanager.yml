@@ -1,0 +1,7 @@
+route:
+  receiver: "ai-sre-agent"
+
+receivers:
+  - name: "ai-sre-agent"
+    webhook_configs:
+      - url: "http://host.docker.internal:8000/api/v1/alerts"

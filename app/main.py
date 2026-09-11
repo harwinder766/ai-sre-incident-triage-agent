@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from app.api.routes_incidents import router as incidents_router
-
+from app.api.routes_alerts import router as alerts_router
 
 app = FastAPI(
     title="AI-SRE Incident Triage Agent",
@@ -11,7 +11,7 @@ app = FastAPI(
 
 
 app.include_router(incidents_router)
-
+app.include_router(alerts_router)
 
 @app.get("/health")
 def health_check():
