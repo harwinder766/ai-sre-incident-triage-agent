@@ -2,11 +2,14 @@ import json
 import logging
 import random
 import sys
+import time
 from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
+from prometheus_client import Counter, Histogram, generate_latest
+from starlette.responses import Response
 
 # Configuration
 SERVICE_NAME = "payment-api"
@@ -16,11 +19,26 @@ SERVICE_NAME = "payment-api"
 # "database"
 # "latency"
 # "error_rate"
-FAILURE_MODE = 'database'
 
+FAILURE_MODE = 'error_rate'
+
+# Prometheus Metrics
+REQUEST_COUNT = Counter(
+    "payment_requests_total",
+    "Total number of payment requests",
+)
+
+ERROR_COUNT = Counter(
+    "payment_errors_total",
+    "Total number of failed payment requests",
+)
+
+REQUEST_LATENCY = Histogram(
+    "payment_request_duration_seconds",
+    "Payment request processing duration in seconds",
+)
 
 # Structured JSON Logger
-
 class JsonFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
@@ -29,12 +47,19 @@ class JsonFormatter(logging.Formatter):
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": record.levelname,
             "service": SERVICE_NAME,
-            "event": getattr(record, "event", "application_event"),
+            "event": getattr(
+                record,
+                "event",
+                "application_event",
+            ),
             "message": record.getMessage(),
         }
 
-        # Add optional structured fields
-        extra_fields = getattr(record, "extra_fields", {})
+        extra_fields = getattr(
+            record,
+            "extra_fields",
+            {},
+        )
 
         if extra_fields:
             log_entry.update(extra_fields)
@@ -43,16 +68,19 @@ class JsonFormatter(logging.Formatter):
 
 
 logger = logging.getLogger(SERVICE_NAME)
+
 logger.setLevel(logging.INFO)
+
 handler = logging.StreamHandler(sys.stdout)
+
 handler.setFormatter(JsonFormatter())
+
 logger.handlers.clear()
 logger.addHandler(handler)
+
 logger.propagate = False
 
-
 # FastAPI application
-
 app = FastAPI(
     title="Simulated Payment API",
     description="Fake customer payment service for AI-SRE testing.",
@@ -66,21 +94,16 @@ class PaymentRequest(BaseModel):
 
 
 # Request logging middleware
-
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
 
-    start_time = datetime.now(timezone.utc)
+    start_time = time.perf_counter()
 
     try:
 
         response = await call_next(request)
 
-        end_time = datetime.now(timezone.utc)
-
-        duration = (
-            end_time - start_time
-        ).total_seconds()
+        duration = time.perf_counter() - start_time
 
         logger.info(
             "HTTP request completed",
@@ -90,7 +113,10 @@ async def log_requests(request: Request, call_next):
                     "method": request.method,
                     "path": request.url.path,
                     "status_code": response.status_code,
-                    "duration_seconds": round(duration, 4),
+                    "duration_seconds": round(
+                        duration,
+                        4,
+                    ),
                 },
             },
         )
@@ -99,11 +125,7 @@ async def log_requests(request: Request, call_next):
 
     except Exception:
 
-        end_time = datetime.now(timezone.utc)
-
-        duration = (
-            end_time - start_time
-        ).total_seconds()
+        duration = time.perf_counter() - start_time
 
         logger.exception(
             "Unhandled application exception",
@@ -112,13 +134,25 @@ async def log_requests(request: Request, call_next):
                 "extra_fields": {
                     "method": request.method,
                     "path": request.url.path,
-                    "duration_seconds": round(duration, 4),
+                    "duration_seconds": round(
+                        duration,
+                        4,
+                    ),
                 },
             },
         )
 
         raise
 
+
+# Prometheus endpoint
+@app.get("/metrics")
+def metrics():
+
+    return Response(
+        content=generate_latest(),
+        media_type="text/plain",
+    )
 
 # Health endpoint
 @app.get("/health")
@@ -162,6 +196,8 @@ def health_check():
 @app.post("/payments")
 def process_payment(payment: PaymentRequest):
 
+    REQUEST_COUNT.inc()
+
     logger.info(
         "Payment request received",
         extra={
@@ -173,20 +209,90 @@ def process_payment(payment: PaymentRequest):
             },
         },
     )
-    # Normal latency
-    processing_time = random.uniform(0.05, 0.2)
 
-    # Simulate high latency
-    if FAILURE_MODE == "latency":
+    start_time = time.perf_counter()
 
-        processing_time = random.uniform(2, 5)
+    try:
+        # Normal processing time
+        processing_time = random.uniform(
+            0.05,
+            0.2,
+        )
+        # High latency
+        if FAILURE_MODE == "latency":
 
-        logger.warning(
-            "High latency failure mode active",
+            processing_time = random.uniform(
+                2,
+                5,
+            )
+
+            logger.warning(
+                "High latency failure mode active",
+                extra={
+                    "event": "high_latency",
+                    "extra_fields": {
+                        "user_id": payment.user_id,
+                        "processing_time_seconds": round(
+                            processing_time,
+                            3,
+                        ),
+                    },
+                },
+            )
+
+        time.sleep(processing_time)
+
+        # Database failure
+        if FAILURE_MODE == "database":
+
+            ERROR_COUNT.inc()
+
+            logger.error(
+                "Database connection pool exhausted",
+                extra={
+                    "event": "database_error",
+                    "extra_fields": {
+                        "user_id": payment.user_id,
+                        "error_type": "connection_pool_exhausted",
+                    },
+                },
+            )
+
+            raise HTTPException(
+                status_code=500,
+                detail="Database connection pool exhausted",
+            )
+        # High error rate
+        if FAILURE_MODE == "error_rate":
+
+            if random.random() < 0.5:
+
+                ERROR_COUNT.inc()
+
+                logger.error(
+                    "Payment processing failed",
+                    extra={
+                        "event": "payment_failure",
+                        "extra_fields": {
+                            "user_id": payment.user_id,
+                            "amount": payment.amount,
+                            "error_type": "payment_processing_failure",
+                        },
+                    },
+                )
+
+                raise HTTPException(
+                    status_code=500,
+                    detail="Payment processing failed",
+                )
+        # Successful payment
+        logger.info(
+            "Payment processed successfully",
             extra={
-                "event": "high_latency",
+                "event": "payment_success",
                 "extra_fields": {
                     "user_id": payment.user_id,
+                    "amount": payment.amount,
                     "processing_time_seconds": round(
                         processing_time,
                         3,
@@ -195,75 +301,18 @@ def process_payment(payment: PaymentRequest):
             },
         )
 
-    # Simulate processing time
-    import time
+        return {
+            "status": "success",
+            "user_id": payment.user_id,
+            "amount": payment.amount,
+            "processing_time": round(
+                processing_time,
+                3,
+            ),
+        }
 
-    time.sleep(processing_time)
+    finally:
 
-    # Simulate database failure
+        duration = time.perf_counter() - start_time
 
-    if FAILURE_MODE == "database":
-
-        logger.error(
-            "Database connection pool exhausted",
-            extra={
-                "event": "database_error",
-                "extra_fields": {
-                    "user_id": payment.user_id,
-                    "error_type": "connection_pool_exhausted",
-                },
-            },
-        )
-
-        raise HTTPException(
-            status_code=500,
-            detail="Database connection pool exhausted",
-        )
-    # Simulate high error rate
-
-    if FAILURE_MODE == "error_rate":
-
-        if random.random() < 0.5:
-
-            logger.error(
-                "Payment processing failed",
-                extra={
-                    "event": "payment_failure",
-                    "extra_fields": {
-                        "user_id": payment.user_id,
-                        "amount": payment.amount,
-                        "error_type": "payment_processing_failure",
-                    },
-                },
-            )
-
-            raise HTTPException(
-                status_code=500,
-                detail="Payment processing failed",
-            )
-        
-    # Successful payment
-    logger.info(
-        "Payment processed successfully",
-        extra={
-            "event": "payment_success",
-            "extra_fields": {
-                "user_id": payment.user_id,
-                "amount": payment.amount,
-                "processing_time_seconds": round(
-                    processing_time,
-                    3,
-                ),
-            },
-        },
-    )
-
-    return {
-        "status": "success",
-        "user_id": payment.user_id,
-        "amount": payment.amount,
-        "processing_time": round(
-            processing_time,
-            3,
-        ),
-    }
+        REQUEST_LATENCY.observe(duration)
