@@ -1,32 +1,3 @@
-# services:
-#   postgres:
-#     image: postgres:16
-#     container_name: ai-sre-postgres
-#     environment:
-#       POSTGRES_USER: postgres
-#       POSTGRES_PASSWORD: postgres
-#       POSTGRES_DB: ai_sre
-#     ports:
-#       - "5432:5432"
-#     volumes:
-#       - postgres_data:/var/lib/postgresql/data
-
-#   prometheus:
-#     image: prom/prometheus:latest
-#     container_name: ai-sre-prometheus
-#     ports:
-#       - "9090:9090"
-#     volumes:
-#       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-#       - ./alerts.yml:/etc/prometheus/alerts.yml:ro
-#     extra_hosts:
-#       - "host.docker.internal:host-gateway"
-    
-
-# volumes:
-#   postgres_data:
-
-
 services:
 
   postgres:
@@ -72,6 +43,33 @@ services:
     
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+  loki:
+    image: grafana/loki:latest
+    container_name: ai-sre-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki-config.yml:/etc/loki/local-config.yaml:ro
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: ai-sre-promtail
+    volumes:
+      - ./promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command:
+      - "-config.file=/etc/promtail/config.yml"
+  
+  payment-api:
+    build:
+      context: ..
+      dockerfile: simulator/services/payment_api/Dockerfile
+    container_name: ai-sre-payment-api
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
 
 
 volumes:
