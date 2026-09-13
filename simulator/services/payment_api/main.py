@@ -20,7 +20,7 @@ SERVICE_NAME = "payment-api"
 # "latency"
 # "error_rate"
 
-FAILURE_MODE = 'error_rate'
+FAILURE_MODE = None  # Change this to simulate different failure modes
 
 # Prometheus Metrics
 REQUEST_COUNT = Counter(
