@@ -1,20 +1,23 @@
 from app.tools.prometheus import PrometheusTool
+import pytest
 
-
-def test_prometheus_query():
+@pytest.mark.asyncio
+async def test_prometheus_query():
     tool = PrometheusTool()
 
-    results = tool.query(
+    results = await tool.query(
         "payment_requests_total"
     )
 
     assert isinstance(results, list)
 
+    await tool.close()
 
-def test_get_service_metrics():
+@pytest.mark.asyncio
+async def test_get_service_metrics():
     tool = PrometheusTool()
 
-    metrics = tool.get_service_metrics(
+    metrics = await tool.get_service_metrics(
         "payment"
     )
 
@@ -25,3 +28,6 @@ def test_get_service_metrics():
     assert metrics["request_rate"] >= 0
     assert metrics["error_rate"] >= 0
     assert metrics["average_latency"] >= 0
+
+    await tool.close()
+    

@@ -1,12 +1,13 @@
 from app.tools.github import github_tool
+import time
+import asyncio  
 
-
-def main():
+async def main():
     print("Testing GitHub tool...\n")
 
     print("=== Recent Commits ===")
 
-    commits = github_tool.get_recent_commits(limit=5)
+    commits = await github_tool.get_recent_commits(limit=5)
 
     for commit in commits:
         print(
@@ -17,7 +18,7 @@ def main():
 
     print("\n=== Issue Search ===")
 
-    issues = github_tool.search_issues(
+    issues = await github_tool.search_issues(
         "incident",
         limit=5,
     )
@@ -29,6 +30,11 @@ def main():
             f"{issue['title']}"
         )
 
+    await github_tool.close()
 
 if __name__ == "__main__":
-    main()
+    x = time.perf_counter()
+    asyncio.run(main())
+    elapsed = time.perf_counter() - x
+    print(f"\nPrometheus tool test completed in {elapsed:.3f} seconds.")
+    

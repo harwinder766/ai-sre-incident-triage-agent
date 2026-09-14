@@ -1,25 +1,33 @@
+import pytest
+
 from app.tools.logs import LogsTool
 
 
-def test_loki_query():
+@pytest.mark.asyncio
+async def test_loki_query():
 
     tool = LogsTool()
 
-    results = tool.query(
+    results = await tool.query(
         '{container=~".+"}',
         limit=10,
     )
 
     assert isinstance(results, list)
 
+    await tool.close()
 
-def test_get_service_logs():
+
+@pytest.mark.asyncio
+async def test_get_service_logs():
 
     tool = LogsTool()
 
-    results = tool.get_service_logs(
+    results = await tool.get_service_logs(
         "ai-sre-payment-api",
         limit=10,
     )
 
     assert isinstance(results, list)
+
+    await tool.close()

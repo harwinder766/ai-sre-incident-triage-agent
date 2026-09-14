@@ -1,38 +1,45 @@
+import asyncio
+import time
 from app.tools.prometheus import prometheus_tool
 
 
-def main():
-
-    print("Testing Prometheus tool...\n")
+async def main():
+    print("Testing async Prometheus tool...\n")
 
     print("Request rate:")
     print(
-        prometheus_tool.get_request_rate(
+        await prometheus_tool.get_request_rate(
             "payment"
         )
     )
 
     print("\nError rate:")
     print(
-        prometheus_tool.get_error_rate(
+        await prometheus_tool.get_error_rate(
             "payment"
         )
     )
 
     print("\nAverage latency:")
     print(
-        prometheus_tool.get_average_latency(
+        await prometheus_tool.get_average_latency(
             "payment"
         )
     )
 
     print("\nAll metrics:")
     print(
-        prometheus_tool.get_service_metrics(
+        await prometheus_tool.get_service_metrics(
             "payment"
         )
     )
 
+    # Close the shared AsyncClient
+    await prometheus_tool.close()
+
 
 if __name__ == "__main__":
-    main()
+    x = time.perf_counter()
+    asyncio.run(main())
+    elapsed = time.perf_counter() - x
+    print(f"\nPrometheus tool test completed in {elapsed:.3f} seconds.")
