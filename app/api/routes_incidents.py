@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+import asyncio
 
 from app.graph.graph import graph
 from app.db.database import get_db
@@ -22,7 +23,7 @@ class IncidentRequest(BaseModel):
     
 
 @router.post("/")
-def create_incident(incident: IncidentRequest, db: Session =Depends(get_db)):
+async def create_incident(incident: IncidentRequest, db: Session =Depends(get_db)):
     """
     Receive an incident and send it to the LangGraph workflow.
     """
@@ -35,7 +36,7 @@ def create_incident(incident: IncidentRequest, db: Session =Depends(get_db)):
     }
 
     # Run the LangGraph workflow
-    result = graph.invoke(initial_state)
+    result = await graph.ainvoke(initial_state)
 
     repository = IncidentRepository(db)
 

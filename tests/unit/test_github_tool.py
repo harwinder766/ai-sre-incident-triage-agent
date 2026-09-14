@@ -1,12 +1,12 @@
 import pytest
 
-from app.tools.github import github_tool
+from app.tools.github import GitHubTool
 
 
 @pytest.mark.asyncio
 async def test_get_recent_commits():
 
-    tool = github_tool
+    tool = GitHubTool()
 
     commits = await tool.get_recent_commits(
         limit=5
@@ -25,7 +25,7 @@ async def test_get_recent_commits():
 @pytest.mark.asyncio
 async def test_search_issues():
 
-    tool = github_tool
+    tool = GitHubTool()
 
     issues = await tool.search_issues(
         "incident",
@@ -40,7 +40,7 @@ async def test_search_issues():
 @pytest.mark.asyncio
 async def test_get_issue():
 
-    tool = github_tool
+    tool = GitHubTool()
 
     issues = await tool.search_issues(
         "incident",

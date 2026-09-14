@@ -1,11 +1,12 @@
-from fastapi.testclient import TestClient
+import pytest
+from httpx import ASGITransport, AsyncClient
 
 from app.main import app
 
 
-client = TestClient(app)
+@pytest.mark.asyncio
+async def test_create_incident():
 
-def test_create_incident():
     incident = {
         "incident_id": "TEST-INC-001",
         "service": "payment-api",
@@ -13,10 +14,17 @@ def test_create_incident():
         "error_rate": 0.18,
     }
 
-    response = client.post(
-        "/api/v1/incidents/",
-        json=incident,
-    )
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+    ) as client:
+
+        response = await client.post(
+            "/api/v1/incidents/",
+            json=incident,
+        )
 
     assert response.status_code == 200
 
@@ -27,7 +35,10 @@ def test_create_incident():
     assert result["category"] == "database"
     assert result["severity"] == "SEV-2"
 
-def test_get_incident_from_database():
+
+@pytest.mark.asyncio
+async def test_get_incident_from_database():
+
     incident = {
         "incident_id": "TEST-INC-002",
         "service": "user-api",
@@ -35,16 +46,23 @@ def test_get_incident_from_database():
         "error_rate": 0.20,
     }
 
-    create_response = client.post(
-        "/api/v1/incidents/",
-        json=incident,
-    )
+    transport = ASGITransport(app=app)
 
-    assert create_response.status_code == 200
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+    ) as client:
 
-    get_response = client.get(
-        "/api/v1/incidents/TEST-INC-002"
-    )
+        create_response = await client.post(
+            "/api/v1/incidents/",
+            json=incident,
+        )
+
+        assert create_response.status_code == 200
+
+        get_response = await client.get(
+            "/api/v1/incidents/TEST-INC-002"
+        )
 
     assert get_response.status_code == 200
 

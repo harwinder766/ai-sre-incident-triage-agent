@@ -1,26 +1,36 @@
+import pytest
+
 from app.graph.graph import graph
 
 
-def test_incident_workflow():
-    # Sample incident
+@pytest.mark.asyncio
+async def test_incident_workflow():
+
     initial_state = {
         "incident_id": "INC-001",
-        "service": "payment-api",
+        "service": "payment",
         "message": "DB connection pool exhausted",
         "error_rate": 0.18,
     }
 
-    # Run the LangGraph workflow
-    result = graph.invoke(initial_state)
+    result = await graph.ainvoke(
+        initial_state
+    )
 
-    # Check classification
     assert result["category"] == "database"
+
     assert result["severity"] == "SEV-2"
 
-    # Check investigation
     assert "investigation" in result
+
     assert result["investigation"] != ""
 
-    # Check final response
+    assert "relevant_metrics" in result
+
+    assert "relevant_logs" in result
+
+    assert "recent_commits" in result
+
     assert "final_response" in result
+
     assert result["final_response"] != ""

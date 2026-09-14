@@ -1,5 +1,6 @@
 from .state import IncidentState
-
+from app.investigation.investigator import incident_investigator
+import asyncio
 
 def ingest_incident(state: IncidentState) -> IncidentState:
     """
@@ -78,32 +79,47 @@ def classify_incident(state: IncidentState) -> IncidentState:
     }
 
 
-def generate_initial_investigation(state: IncidentState) -> IncidentState:
-    """
-    Generate a basic investigation summary.
+async def investigate_incident(
+    state: IncidentState,
+) -> IncidentState:
 
-    This is a placeholder for now.
-    Later this node will combine evidence from:
-        - Prometheus
-        - logs
-        - RAG
-        - GitHub
-    """
+    print("🔹 Investigating incident...")
 
-    print("🔹 Generating initial investigation...")
+    service = state["service"]
+
+    # For now we derive the container name from the service.
+    # Later this can come from configuration.
+    container_name = "ai-sre-payment-api"
+
+    result = await incident_investigator.investigate(
+        service=service,
+        container_name=container_name,
+    )
+
+    metrics = result.get("metrics", {})
+    logs = result.get("logs", [])
+    recent_commits = result.get(
+        "recent_commits",
+        [],
+    )
 
     investigation = (
-        f"Incident {state['incident_id']} affects the "
-        f"{state['service']} service. "
-        f"The incident is classified as {state['severity']} "
-        f"and categorized as {state['category']}."
+        f"Incident {state['incident_id']} "
+        f"is affecting the {service} service.\n"
+        f"Category: {state.get('category', 'unknown')}\n"
+        f"Severity: {state.get('severity', 'unknown')}\n\n"
+        f"Current metrics: {metrics}\n"
+        f"Relevant logs: {logs}\n"
+        f"Recent commits: {recent_commits}"
     )
 
     return {
         **state,
         "investigation": investigation,
+        "relevant_metrics": metrics,
+        "relevant_logs": logs,
+        "recent_commits": recent_commits,
     }
-
 
 def generate_final_response(state: IncidentState) -> IncidentState:
     """

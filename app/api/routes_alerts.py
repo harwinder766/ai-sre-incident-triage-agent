@@ -3,6 +3,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+import asyncio
 
 from app.db.database import get_db
 from app.db.repository import IncidentRepository
@@ -61,7 +62,7 @@ def map_alert_severity(alert_severity: str | None) -> str:
 
 
 @router.post("/")
-def receive_alert(
+async def receive_alert(
     payload: dict[str, Any],
     db: Session = Depends(get_db),
 ):
@@ -191,7 +192,7 @@ def receive_alert(
         }
 
         # Process through LangGraph
-        result = graph.invoke(initial_state)
+        result = await graph.ainvoke(initial_state)
 
         # Alertmanager is the source of the alert severity,
         # so preserve that severity instead of relying only

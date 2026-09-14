@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI  # type: ignore[import-not-found]
 
 from app.api.routes_incidents import router as incidents_router
 from app.api.routes_alerts import router as alerts_router
