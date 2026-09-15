@@ -28,6 +28,7 @@ data/local/
 faiss_index/
 chroma/
 vectorstore/
+data/vector_store/
 
 # Model/cache files
 .cache/

@@ -9,7 +9,9 @@ dependencies = [
     "uvicorn",
     "pydantic",
     "langchain",
+    "langchain-text-splitters",
     "langgraph",
+    "faiss-cpu",
 ]
 
 [project.optional-dependencies]
