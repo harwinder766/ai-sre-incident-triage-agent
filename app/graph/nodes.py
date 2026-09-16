@@ -94,6 +94,7 @@ async def investigate_incident(
     result = await incident_investigator.investigate(
         service=service,
         container_name=container_name,
+        incident_message=state["message"]
     )
 
     metrics = result.get("metrics", {})
@@ -101,6 +102,10 @@ async def investigate_incident(
     recent_commits = result.get(
         "recent_commits",
         [],
+    )
+    rag_evidence = result.get(
+        "rag_evidence",
+        []
     )
 
     investigation = (
@@ -110,6 +115,7 @@ async def investigate_incident(
         f"Severity: {state.get('severity', 'unknown')}\n\n"
         f"Current metrics: {metrics}\n"
         f"Relevant logs: {logs}\n"
+        f"RAG evidence: {rag_evidence}\n"
         f"Recent commits: {recent_commits}"
     )
 
@@ -119,6 +125,7 @@ async def investigate_incident(
         "relevant_metrics": metrics,
         "relevant_logs": logs,
         "recent_commits": recent_commits,
+        "rag_evidence": rag_evidence,
     }
 
 def generate_final_response(state: IncidentState) -> IncidentState:

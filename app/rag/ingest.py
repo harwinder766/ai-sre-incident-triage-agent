@@ -245,50 +245,6 @@ class DocumentSplitter:
                 chunk_idx + 1
             )
 
-# class EmbeddingGenerator:
-#     """Responsible for generating embeddings fordocument chunks."""
-
-#     def __init__(
-#         self,
-#         model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
-#     ) -> None:
-#         self.model_name = model_name
-#         self._embedding_model = HuggingFaceEmbeddings(
-#             model_name = self.model_name,
-#             model_kwargs = {"device": "cpu"}, # Use "cuda" if GPU is available
-#             embedding_kwargs = {"normalize_embeddings": True},
-#         )
-
-#     def embed_documents(
-#         self,
-#         documents: Iterable[Document],
-#     ) -> list[list[float]]:
-#         """
-#         Generate embeddings for a list of documents.
-#         """
-
-#         texts = [doc.page_content for doc in documents]
-
-#         return self._embedding_model.embed_documents(texts)
-
-#     def embed_query(
-#         self,
-#         query: str,
-#     ) -> list[float]:
-#         """
-#         Generate an embedding for a single query string.
-#         """
-
-#         return self._embedding_model.embed_query(query)
-
-#     @cached_property
-#     def embedding_dimension(self) -> int:
-#         """
-#         Return the dimensionality of the embeddings.
-#         """
-
-#         return len(self.embed_query('dimensions back'))
-
 class ChromaStore:
     """
     ChromaDB vector store for storing and retrieving

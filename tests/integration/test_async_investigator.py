@@ -9,6 +9,10 @@ async def test_async_investigation():
     result = await incident_investigator.investigate(
         service="payment",
         container_name="ai-sre-payment-api",
+        incident_message=(
+        "Payment API database connection "
+        "pool exhausted"
+    )
     )
 
     assert isinstance(result, dict)
