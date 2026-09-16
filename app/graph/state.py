@@ -18,6 +18,9 @@ class IncidentState(TypedDict, total=False):
 
     root_cause: str
     confidence: float
+    reasoning: str
+    supporting_evidence: list[str]
+    
     remediation: str
 
     final_response: str

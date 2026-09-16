@@ -1,5 +1,7 @@
 from .state import IncidentState
 from app.investigation.investigator import incident_investigator
+from app.analysis.analyzer import incident_analyzer
+
 import asyncio
 
 def ingest_incident(state: IncidentState) -> IncidentState:
@@ -128,22 +130,63 @@ async def investigate_incident(
         "rag_evidence": rag_evidence,
     }
 
-def generate_final_response(state: IncidentState) -> IncidentState:
-    """
-    Generate the final response returned by the workflow.
-    """
+async def analyze_incident(
+    state: IncidentState,
+) -> IncidentState:
+
+    print("🔹 Analyzing incident...")
+
+    analysis = await incident_analyzer.analyze(
+        service=state["service"],
+        message=state["message"],
+        category=state.get("category", "unknown"),
+        severity=state.get("severity", "unknown"),
+        metrics=state.get("relevant_metrics", {}),
+        logs=state.get("relevant_logs", []),
+        recent_commits=state.get("recent_commits", []),
+        rag_evidence=state.get("rag_evidence", []),
+    )
+
+    return {
+        **state,
+        "root_cause": analysis.root_cause,
+        "confidence": analysis.confidence,
+        "reasoning": analysis.reasoning,
+        "supporting_evidence": analysis.supporting_evidence,
+    }
+
+def generate_final_response(
+    state: IncidentState,
+) -> IncidentState:
 
     print("🔹 Generating final response...")
 
     final_response = (
-        f"Incident {state['incident_id']} processed successfully.\n"
+        f"Incident {state['incident_id']} "
+        f"processed successfully.\n\n"
+
         f"Service: {state['service']}\n"
         f"Category: {state['category']}\n"
-        f"Severity: {state['severity']}\n"
-        f"Investigation: {state.get('investigation', 'Not available')}"
+        f"Severity: {state['severity']}\n\n"
+
+        f"Root Cause:\n"
+        f"{state.get('root_cause', 'Unknown')}\n\n"
+
+        f"Confidence:\n"
+        f"{state.get('confidence', 0.0):.2f}\n\n"
+
+        f"Reasoning:\n"
+        f"{state.get('reasoning', 'Not available')}\n\n"
+
+        f"Supporting Evidence:\n"
+        f"{state.get('supporting_evidence', [])}\n\n"
+
+        f"Investigation:\n"
+        f"{state.get('investigation', 'Not available')}"
     )
 
     return {
         **state,
         "final_response": final_response,
     }
+
