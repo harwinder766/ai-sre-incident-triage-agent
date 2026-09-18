@@ -28,4 +28,7 @@ class IncidentState(TypedDict, total=False):
     approval_status: str
     approval_reason: str
 
+    github_issue: dict[str, Any]
+    slack_notification: dict[str, Any]
+
     final_response: str

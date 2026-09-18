@@ -1,9 +1,12 @@
 from .state import IncidentState
 from app.investigation.investigator import incident_investigator
 from app.analysis.analyzer import incident_analyzer
+from app.actions.github_action import create_incident_issue
+from app.actions.slack_actions import notify_incident   
 
 import asyncio
 from langgraph.types import interrupt
+
 
 def ingest_incident(state: IncidentState) -> IncidentState:
     """
@@ -265,4 +268,95 @@ def generate_final_response(state: IncidentState) -> IncidentState:
     return {
         **state,
         "final_response": final_response,
+    }
+
+async def execute_external_actions(
+    state: IncidentState,
+) -> IncidentState:
+    print("🔹 Executing external actions...")
+
+    if state.get("approval_status") != "approved":
+        print("   Skipping external actions: remediation not approved.")
+
+        return {
+            **state,
+            "github_issue": {
+                "status": "skipped",
+                "reason": "Remediation was not approved.",
+            },
+            "slack_notification": {
+                "status": "skipped",
+                "reason": "Remediation was not approved.",
+            },
+        }
+
+    github_task = create_incident_issue(
+        incident_id=state["incident_id"],
+        service=state["service"],
+        severity=state.get("severity", "unknown"),
+        root_cause=state.get("root_cause", "Unknown"),
+        confidence=state.get("confidence", 0.0),
+        reasoning=state.get("reasoning", ""),
+        supporting_evidence=state.get(
+            "supporting_evidence",
+            [],
+        ),
+        remediation=state.get(
+            "remediation",
+            "Not available",
+        ),
+        expected_impact=state.get(
+            "expected_impact",
+            "Not available",
+        ),
+        risks=state.get(
+            "risks",
+            [],
+        ),
+    )
+
+    github_result = None
+
+    try:
+        github_result = await github_task
+
+    except Exception as exc:
+        github_result = {
+            "status": "failed",
+            "error": str(exc),
+        }
+
+    github_url = None
+
+    if github_result.get("status") != "failed":
+        github_url = github_result.get("url")
+
+    try:
+        slack_result = await notify_incident(
+            incident_id=state["incident_id"],
+            service=state["service"],
+            severity=state.get("severity", "unknown"),
+            root_cause=state.get("root_cause", "Unknown"),
+            confidence=state.get("confidence", 0.0),
+            remediation=state.get(
+                "remediation",
+                "Not available",
+            ),
+            approval_status=state.get(
+                "approval_status",
+                "unknown",
+            ),
+            github_issue_url=github_url,
+        )
+
+    except Exception as exc:
+        slack_result = {
+            "status": "failed",
+            "error": str(exc),
+        }
+
+    return {
+        **state,
+        "github_issue": github_result,
+        "slack_notification": slack_result,
     }

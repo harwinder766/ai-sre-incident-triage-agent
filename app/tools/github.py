@@ -190,5 +190,42 @@ class GitHubTool:
             "updated_at": issue["updated_at"],
         }
 
+    async def create_issue(
+        self,
+        title: str,
+        body: str,
+        labels: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Create a GitHub issue for an incident.
+        """
+    
+        self._validate_repository()
+    
+        client = self._get_client()
+    
+        payload: dict[str, Any] = {
+            "title": title,
+            "body": body,
+        }
+    
+        if labels:
+            payload["labels"] = labels
+    
+        response = await client.post(
+            f"{self.base_url}/repos/{self.owner}/{self.repo}/issues",
+            json=payload,
+        )
+    
+        response.raise_for_status()
+    
+        issue = response.json()
+    
+        return {
+            "number": issue["number"],
+            "title": issue["title"],
+            "state": issue["state"],
+            "url": issue["html_url"],
+        }
 
 github_tool = GitHubTool()

@@ -5,6 +5,7 @@ from app.api.routes_alerts import router as alerts_router
 
 from app.rag.factory import create_rag_tool
 
+rag_tool = create_rag_tool()
 
 app = FastAPI(
     title="AI-SRE Incident Triage Agent",
@@ -14,8 +15,6 @@ app = FastAPI(
 
 app.include_router(incidents_router)
 app.include_router(alerts_router)
-
-rag_tool = create_rag_tool()
 
 @app.get("/health")
 def health_check():
