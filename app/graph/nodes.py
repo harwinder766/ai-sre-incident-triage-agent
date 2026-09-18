@@ -3,6 +3,7 @@ from app.investigation.investigator import incident_investigator
 from app.analysis.analyzer import incident_analyzer
 
 import asyncio
+from langgraph.types import interrupt
 
 def ingest_incident(state: IncidentState) -> IncidentState:
     """
@@ -153,40 +154,115 @@ async def analyze_incident(
         "confidence": analysis.confidence,
         "reasoning": analysis.reasoning,
         "supporting_evidence": analysis.supporting_evidence,
+        "remediation": analysis.remediation,
+        "expected_impact": analysis.expected_impact,
+        "risks": analysis.risks,
     }
 
-def generate_final_response(
-    state: IncidentState,
-) -> IncidentState:
+def request_approval(state: IncidentState) -> IncidentState:
+    print("🔹 Waiting for human approval...")
 
+    approval_request = {
+        "incident_id": state["incident_id"],
+        "service": state["service"],
+        "severity": state.get("severity", "unknown"),
+        "root_cause": state.get("root_cause", "Unknown"),
+        "confidence": state.get("confidence", 0.0),
+        "reasoning": state.get("reasoning", ""),
+        "supporting_evidence": state.get(
+            "supporting_evidence",
+            [],
+        ),
+        "remediation": state.get(
+            "remediation",
+            "No remediation proposed.",
+        ),
+        "expected_impact": state.get(
+            "expected_impact",
+            "Unknown.",
+        ),
+        "risks": state.get(
+            "risks",
+            [],
+        ),
+    }
+
+    human_response = interrupt(approval_request)
+
+    if not isinstance(human_response, dict):
+        raise ValueError(
+            "Human approval response must be a dictionary."
+        )
+
+    decision = human_response.get("decision")
+
+    if decision not in {"approve", "reject"}:
+        raise ValueError(
+            "Approval decision must be either 'approve' or 'reject'."
+        )
+
+    if decision == "approve":
+        return {
+            **state,
+            "approval_status": "approved",
+            "approval_reason": human_response.get(
+                "reason",
+                "Approved by human.",
+            ),
+        }
+
+    return {
+        **state,
+        "approval_status": "rejected",
+        "approval_reason": human_response.get(
+            "reason",
+            "Rejected by human.",
+        ),
+    }
+
+def route_after_approval(state: IncidentState) -> str:
+    if state.get("approval_status") == "approved":
+        return "approved"
+
+    return "rejected"
+
+def generate_final_response(state: IncidentState) -> IncidentState:
     print("🔹 Generating final response...")
 
     final_response = (
-        f"Incident {state['incident_id']} "
-        f"processed successfully.\n\n"
+        f"Incident {state['incident_id']} processed.\n\n"
 
         f"Service: {state['service']}\n"
-        f"Category: {state['category']}\n"
-        f"Severity: {state['severity']}\n\n"
+        f"Category: {state.get('category', 'unknown')}\n"
+        f"Severity: {state.get('severity', 'unknown')}\n\n"
 
-        f"Root Cause:\n"
+        f"========== ROOT CAUSE ==========\n"
         f"{state.get('root_cause', 'Unknown')}\n\n"
 
         f"Confidence:\n"
         f"{state.get('confidence', 0.0):.2f}\n\n"
 
-        f"Reasoning:\n"
+        f"========== REASONING ==========\n"
         f"{state.get('reasoning', 'Not available')}\n\n"
 
-        f"Supporting Evidence:\n"
+        f"========== SUPPORTING EVIDENCE ==========\n"
         f"{state.get('supporting_evidence', [])}\n\n"
 
-        f"Investigation:\n"
-        f"{state.get('investigation', 'Not available')}"
+        f"========== REMEDIATION ==========\n"
+        f"{state.get('remediation', 'Not available')}\n\n"
+
+        f"Expected Impact:\n"
+        f"{state.get('expected_impact', 'Not available')}\n\n"
+
+        f"Risks:\n"
+        f"{state.get('risks', [])}\n\n"
+
+        f"========== APPROVAL ==========\n"
+        f"Status: {state.get('approval_status', 'unknown')}\n"
+        f"Reason: {state.get('approval_reason', 'Not available')}"
     )
 
     return {
         **state,
         "final_response": final_response,
     }
-

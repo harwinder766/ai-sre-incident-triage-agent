@@ -22,5 +22,10 @@ class IncidentState(TypedDict, total=False):
     supporting_evidence: list[str]
     
     remediation: str
+    expected_impact: str
+    risks: list[str]
+    
+    approval_status: str
+    approval_reason: str
 
     final_response: str

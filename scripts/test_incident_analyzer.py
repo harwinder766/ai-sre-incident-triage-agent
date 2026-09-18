@@ -64,6 +64,21 @@ async def main() -> None:
         result.supporting_evidence,
     )
 
+    print(
+        "Remediation:",
+        result.remediation,
+    )
+
+    print(
+        "Expected impact:",
+        result.expected_impact,
+    )
+
+    print(
+        "Risks:",
+        result.risks,
+    )
+
 
 if __name__ == "__main__":
     asyncio.run(main())
