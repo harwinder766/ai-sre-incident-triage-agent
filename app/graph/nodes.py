@@ -3,6 +3,8 @@ from app.investigation.investigator import incident_investigator
 from app.analysis.analyzer import incident_analyzer
 from app.actions.github_action import create_incident_issue
 from app.actions.slack_actions import notify_incident   
+from app.actions.remediation_actions import execute_remediation
+from langgraph.types import interrupt
 
 import asyncio
 from langgraph.types import interrupt
@@ -223,12 +225,6 @@ def request_approval(state: IncidentState) -> IncidentState:
         ),
     }
 
-def route_after_approval(state: IncidentState) -> str:
-    if state.get("approval_status") == "approved":
-        return "approved"
-
-    return "rejected"
-
 def generate_final_response(state: IncidentState) -> IncidentState:
     print("🔹 Generating final response...")
 
@@ -360,3 +356,43 @@ async def execute_external_actions(
         "github_issue": github_result,
         "slack_notification": slack_result,
     }
+
+async def execute_remediation_action(state: IncidentState) -> IncidentState:
+    print('🔹 Executing remediation action...')
+    if state.get("approval_status") != "approved":
+        return {
+            **state,
+            "execution_status": "skipped",
+            "execution_result": {
+                "status": "failed",
+                "reason": "Remediation was not approved by human.",
+            },
+        }
+
+    if state.get("remediation") is None:
+        return {
+            **state,
+            "execution_status": "skipped",
+            "execution_result": {
+                "status": "failed",
+                "reason": "No remediation plan provided.",
+            },
+        }
+
+    remediation = state["remediation"]
+
+    try:
+        result = await execute_remediation(remediation)
+        return {
+            **state,
+            "execution_status": "completed",
+            "execution_result": result,
+        }
+    except Exception as exc:
+        return {
+            **state,
+            "execution_result": {
+                "status": "failed",
+                "error": str(exc),
+            }
+        }

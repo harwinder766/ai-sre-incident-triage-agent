@@ -11,7 +11,11 @@ from pydantic import BaseModel
 from prometheus_client import Counter, Histogram, generate_latest
 from starlette.responses import Response
 
+
+# ============================================================
 # Configuration
+# ============================================================
+
 SERVICE_NAME = "payment-api"
 
 # Possible values:
@@ -19,10 +23,19 @@ SERVICE_NAME = "payment-api"
 # "database"
 # "latency"
 # "error_rate"
+#
+# Set this to "database" when you want to simulate
+# a database connection-pool incident.
+FAILURE_MODE = "database"
 
-FAILURE_MODE = None  # Change this to simulate different failure modes
+# Simulated database connection pool.
+DB_POOL_SIZE = 5
 
+
+# ============================================================
 # Prometheus Metrics
+# ============================================================
+
 REQUEST_COUNT = Counter(
     "payment_requests_total",
     "Total number of payment requests",
@@ -38,7 +51,11 @@ REQUEST_LATENCY = Histogram(
     "Payment request processing duration in seconds",
 )
 
+
+# ============================================================
 # Structured JSON Logger
+# ============================================================
+
 class JsonFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
@@ -80,20 +97,35 @@ logger.addHandler(handler)
 
 logger.propagate = False
 
-# FastAPI application
+
+# ============================================================
+# FastAPI Application
+# ============================================================
+
 app = FastAPI(
     title="Simulated Payment API",
     description="Fake customer payment service for AI-SRE testing.",
     version="0.1.0",
 )
 
-# Request model
+
+# ============================================================
+# Request Models
+# ============================================================
+
 class PaymentRequest(BaseModel):
     user_id: str
     amount: float
 
 
-# Request logging middleware
+class DatabasePoolUpdate(BaseModel):
+    pool_size: int
+
+
+# ============================================================
+# Request Logging Middleware
+# ============================================================
+
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
 
@@ -145,7 +177,81 @@ async def log_requests(request: Request, call_next):
         raise
 
 
-# Prometheus endpoint
+# ============================================================
+# Remediation Endpoint
+# ============================================================
+
+@app.post("/admin/remediation/database-pool")
+async def update_database_pool(
+    request: DatabasePoolUpdate,
+):
+
+    global DB_POOL_SIZE
+    global FAILURE_MODE
+
+    if request.pool_size <= 0:
+
+        raise HTTPException(
+            status_code=400,
+            detail="pool_size must be greater than 0",
+        )
+
+    old_pool_size = DB_POOL_SIZE
+
+    DB_POOL_SIZE = request.pool_size
+
+    # --------------------------------------------------------
+    # Simulated remediation
+    #
+    # In our simulator, the "database" failure represents
+    # connection-pool exhaustion.
+    #
+    # Increasing the pool resolves that simulated failure.
+    # --------------------------------------------------------
+
+    if FAILURE_MODE == "database":
+        FAILURE_MODE = None
+
+    logger.info(
+        "Database pool remediation executed",
+        extra={
+            "event": "remediation",
+            "extra_fields": {
+                "action": "increase_database_pool",
+                "old_pool_size": old_pool_size,
+                "new_pool_size": DB_POOL_SIZE,
+                "failure_mode": FAILURE_MODE,
+            },
+        },
+    )
+
+    return {
+        "status": "success",
+        "action": "increase_database_pool",
+        "old_pool_size": old_pool_size,
+        "new_pool_size": DB_POOL_SIZE,
+        "failure_mode": FAILURE_MODE,
+    }
+
+
+# ============================================================
+# Remediation Status Endpoint
+# ============================================================
+
+@app.get("/admin/remediation/status")
+def remediation_status():
+
+    return {
+        "service": SERVICE_NAME,
+        "database_pool_size": DB_POOL_SIZE,
+        "failure_mode": FAILURE_MODE,
+    }
+
+
+# ============================================================
+# Prometheus Endpoint
+# ============================================================
+
 @app.get("/metrics")
 def metrics():
 
@@ -154,7 +260,11 @@ def metrics():
         media_type="text/plain",
     )
 
-# Health endpoint
+
+# ============================================================
+# Health Endpoint
+# ============================================================
+
 @app.get("/health")
 def health_check():
 
@@ -166,6 +276,7 @@ def health_check():
                 "event": "database_connection_failure",
                 "extra_fields": {
                     "failure_mode": FAILURE_MODE,
+                    "database_pool_size": DB_POOL_SIZE,
                 },
             },
         )
@@ -174,6 +285,7 @@ def health_check():
             "status": "unhealthy",
             "service": SERVICE_NAME,
             "reason": "database connection failure",
+            "database_pool_size": DB_POOL_SIZE,
         }
 
     logger.info(
@@ -182,6 +294,7 @@ def health_check():
             "event": "health_check",
             "extra_fields": {
                 "status": "healthy",
+                "database_pool_size": DB_POOL_SIZE,
             },
         },
     )
@@ -189,12 +302,18 @@ def health_check():
     return {
         "status": "healthy",
         "service": SERVICE_NAME,
+        "database_pool_size": DB_POOL_SIZE,
     }
 
 
-# Payment endpoint
+# ============================================================
+# Payment Endpoint
+# ============================================================
+
 @app.post("/payments")
-def process_payment(payment: PaymentRequest):
+def process_payment(
+    payment: PaymentRequest,
+):
 
     REQUEST_COUNT.inc()
 
@@ -213,12 +332,20 @@ def process_payment(payment: PaymentRequest):
     start_time = time.perf_counter()
 
     try:
+
+        # ----------------------------------------------------
         # Normal processing time
+        # ----------------------------------------------------
+
         processing_time = random.uniform(
             0.05,
             0.2,
         )
-        # High latency
+
+        # ----------------------------------------------------
+        # High latency failure
+        # ----------------------------------------------------
+
         if FAILURE_MODE == "latency":
 
             processing_time = random.uniform(
@@ -242,7 +369,10 @@ def process_payment(payment: PaymentRequest):
 
         time.sleep(processing_time)
 
+        # ----------------------------------------------------
         # Database failure
+        # ----------------------------------------------------
+
         if FAILURE_MODE == "database":
 
             ERROR_COUNT.inc()
@@ -254,6 +384,7 @@ def process_payment(payment: PaymentRequest):
                     "extra_fields": {
                         "user_id": payment.user_id,
                         "error_type": "connection_pool_exhausted",
+                        "database_pool_size": DB_POOL_SIZE,
                     },
                 },
             )
@@ -262,7 +393,11 @@ def process_payment(payment: PaymentRequest):
                 status_code=500,
                 detail="Database connection pool exhausted",
             )
-        # High error rate
+
+        # ----------------------------------------------------
+        # High error-rate failure
+        # ----------------------------------------------------
+
         if FAILURE_MODE == "error_rate":
 
             if random.random() < 0.5:
@@ -285,7 +420,11 @@ def process_payment(payment: PaymentRequest):
                     status_code=500,
                     detail="Payment processing failed",
                 )
+
+        # ----------------------------------------------------
         # Successful payment
+        # ----------------------------------------------------
+
         logger.info(
             "Payment processed successfully",
             extra={

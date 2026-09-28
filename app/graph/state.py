@@ -21,9 +21,12 @@ class IncidentState(TypedDict, total=False):
     reasoning: str
     supporting_evidence: list[str]
     
-    remediation: str
+    remediation: dict[str, Any]
     expected_impact: str
     risks: list[str]
+
+    execution_status: str
+    execution_result: dict[str, Any]
     
     approval_status: str
     approval_reason: str

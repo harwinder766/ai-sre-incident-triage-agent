@@ -1,5 +1,12 @@
 from pydantic import BaseModel, Field
 
+class RemediationPlan(BaseModel):
+    description: str
+    action: str
+    parameters: dict[str, object] = Field(default_factory=dict)
+    expected_impact: str
+    risks: list[str] = Field(default_factory=list)
+
 
 class IncidentAnalysis(BaseModel):
     root_cause: str = Field(
@@ -28,11 +35,9 @@ class IncidentAnalysis(BaseModel):
         )
     )
 
-    remediation: str = Field(
+    remediation: RemediationPlan = Field(
         description=(
-            "Explain how the incident could be remediated. "
-            "Describe the recommended solution in human-readable "
-            "terms. Do not generate shell commands or execute actions."
+            "Recommended remediation plan to address the root cause."
         )
     )
 
@@ -47,3 +52,4 @@ class IncidentAnalysis(BaseModel):
             "Potential risks or side effects of the recommended remediation."
         )
     )
+
