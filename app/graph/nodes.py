@@ -4,8 +4,9 @@ from app.analysis.analyzer import incident_analyzer
 from app.actions.github_action import create_incident_issue
 from app.actions.slack_actions import notify_incident   
 from app.actions.remediation_actions import execute_remediation
-from langgraph.types import interrupt
+from app.tools.prometheus import prometheus_tool
 
+from langgraph.types import interrupt
 import asyncio
 from langgraph.types import interrupt
 
@@ -225,47 +226,6 @@ def request_approval(state: IncidentState) -> IncidentState:
         ),
     }
 
-def generate_final_response(state: IncidentState) -> IncidentState:
-    print("🔹 Generating final response...")
-
-    final_response = (
-        f"Incident {state['incident_id']} processed.\n\n"
-
-        f"Service: {state['service']}\n"
-        f"Category: {state.get('category', 'unknown')}\n"
-        f"Severity: {state.get('severity', 'unknown')}\n\n"
-
-        f"========== ROOT CAUSE ==========\n"
-        f"{state.get('root_cause', 'Unknown')}\n\n"
-
-        f"Confidence:\n"
-        f"{state.get('confidence', 0.0):.2f}\n\n"
-
-        f"========== REASONING ==========\n"
-        f"{state.get('reasoning', 'Not available')}\n\n"
-
-        f"========== SUPPORTING EVIDENCE ==========\n"
-        f"{state.get('supporting_evidence', [])}\n\n"
-
-        f"========== REMEDIATION ==========\n"
-        f"{state.get('remediation', 'Not available')}\n\n"
-
-        f"Expected Impact:\n"
-        f"{state.get('expected_impact', 'Not available')}\n\n"
-
-        f"Risks:\n"
-        f"{state.get('risks', [])}\n\n"
-
-        f"========== APPROVAL ==========\n"
-        f"Status: {state.get('approval_status', 'unknown')}\n"
-        f"Reason: {state.get('approval_reason', 'Not available')}"
-    )
-
-    return {
-        **state,
-        "final_response": final_response,
-    }
-
 async def execute_external_actions(
     state: IncidentState,
 ) -> IncidentState:
@@ -388,11 +348,228 @@ async def execute_remediation_action(state: IncidentState) -> IncidentState:
             "execution_status": "completed",
             "execution_result": result,
         }
+    # except Exception as exc:
+    #     return {
+    #         **state,
+    #         "execution_status": "failed",
+    #         "execution_result": {
+    #             "status": "failed",
+    #             "error": str(exc),
+    #         }
+    #     }
+
     except Exception as exc:
+        print("\n❌ Remediation execution failed")
+        print("Remediation:", remediation)
+        print("Exception type:", type(exc).__name__)
+        print("Exception:", exc)
+    
         return {
             **state,
+            "execution_status": "failed",
             "execution_result": {
                 "status": "failed",
                 "error": str(exc),
-            }
+            },
         }
+
+async def verify_remediation(
+    state: IncidentState,
+) -> IncidentState:
+
+    print("🔹 Verifying remediation...")
+
+    if state.get("execution_status") != "completed":
+
+        return {
+            **state,
+            "verification_status": "skipped",
+            "verification_result": {
+                "status": "skipped",
+                "reason": "Remediation was not completed.",
+            },
+        }
+
+    await asyncio.sleep(5)
+
+    try:
+
+        metrics = await prometheus_tool.get_service_metrics(
+            service=state["service"]
+        )
+
+        before_metrics = state.get(
+            "relevant_metrics",
+            {},
+        )
+
+        before_error_rate = float(
+            before_metrics.get(
+                "error_rate",
+                0.0,
+            )
+        )
+
+        before_latency = float(
+            before_metrics.get(
+                "average_latency",
+                0.0,
+            )
+        )
+
+        after_error_rate = float(
+            metrics.get(
+                "error_rate",
+                0.0,
+            )
+        )
+
+        after_latency = float(
+            metrics.get(
+                "average_latency",
+                0.0,
+            )
+        )
+
+        error_rate_recovered = after_error_rate < 0.10
+
+        latency_recovered = (
+            after_latency < 2.0
+            if after_latency > 0
+            else True
+        )
+
+        error_rate_improved = (
+            after_error_rate < before_error_rate
+        )
+
+        latency_improved = (
+            after_latency < before_latency
+            if before_latency > 0
+            else True
+        )
+
+        passed = (
+            error_rate_recovered
+            and latency_recovered
+            and error_rate_improved
+        )
+
+        if passed:
+
+            verification_status = "passed"
+
+            verification_result = {
+                "status": "passed",
+                "message": (
+                    "System metrics indicate that the "
+                    "incident has recovered after remediation."
+                ),
+                "before": {
+                    "error_rate": before_error_rate,
+                    "average_latency": before_latency,
+                },
+                "after": {
+                    "error_rate": after_error_rate,
+                    "average_latency": after_latency,
+                },
+            }
+
+        else:
+
+            verification_status = "failed"
+
+            verification_result = {
+                "status": "failed",
+                "message": (
+                    "The remediation executed successfully, "
+                    "but the system has not recovered sufficiently."
+                ),
+                "before": {
+                    "error_rate": before_error_rate,
+                    "average_latency": before_latency,
+                },
+                "after": {
+                    "error_rate": after_error_rate,
+                    "average_latency": after_latency,
+                },
+                "checks": {
+                    "error_rate_recovered": error_rate_recovered,
+                    "latency_recovered": latency_recovered,
+                    "error_rate_improved": error_rate_improved,
+                    "latency_improved": latency_improved,
+                },
+            }
+
+        return {
+            **state,
+            "verification_status": verification_status,
+            "verification_result": verification_result,
+            "post_remediation_metrics": metrics,
+        }
+
+    except Exception as exc:
+
+        return {
+            **state,
+            "verification_status": "failed",
+            "verification_result": {
+                "status": "failed",
+                "reason": "Unable to verify remediation.",
+                "error": str(exc),
+            },
+        }
+
+def generate_final_response(
+    state: IncidentState,
+) -> IncidentState:
+
+    verification_status = state.get(
+        "verification_status",
+        "not_started",
+    )
+
+    verification_result = state.get(
+        "verification_result",
+        {},
+    )
+
+    final_response = (
+        f"Incident {state['incident_id']} processed.\n\n"
+
+        f"Service: {state['service']}\n"
+        f"Category: {state.get('category', 'unknown')}\n"
+        f"Severity: {state.get('severity', 'unknown')}\n\n"
+
+        f"========== ROOT CAUSE ==========\n"
+        f"{state.get('root_cause', 'Unknown')}\n\n"
+
+        f"Confidence:\n"
+        f"{state.get('confidence', 0.0):.2f}\n\n"
+
+        f"========== REMEDIATION ==========\n"
+        f"{state.get('remediation', {})}\n\n"
+
+        f"Expected Impact:\n"
+        f"{state.get('expected_impact', 'Unknown')}\n\n"
+
+        f"Risks:\n"
+        f"{state.get('risks', [])}\n\n"
+
+        f"========== APPROVAL ==========\n"
+        f"Status: {state.get('approval_status', 'unknown')}\n"
+        f"Reason: {state.get('approval_reason', 'Unknown')}\n\n"
+
+        f"========== EXECUTION ==========\n"
+        f"Status: {state.get('execution_status', 'not_started')}\n"
+        f"Result: {state.get('execution_result', {})}\n\n"
+
+        f"========== VERIFICATION ==========\n"
+        f"Status: {verification_status}\n"
+        f"Result: {verification_result}\n"
+    )
+
+    return {
+        **state,
+        "final_response": final_response,
+    }

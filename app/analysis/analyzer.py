@@ -7,41 +7,41 @@ from langchain_openai import ChatOpenAI
 from app.analysis.schema import IncidentAnalysis
 
 
-load_dotenv()
+load_dotenv(override=True)
 
 
-NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
+XKIRO_API_KEY = os.getenv("XKIRO_API_KEY")
 
-NVIDIA_BASE_URL = os.getenv(
-    "NVIDIA_BASE_URL",
-    "https://integrate.api.nvidia.com/v1",
+XKIRO_BASE_URL = os.getenv(
+    "XKIRO_BASE_URL",
+    "https://api.xkiro.com/v1",
 )
 
-NVIDIA_MODEL = os.getenv(
-    "NVIDIA_MODEL",
-    "deepseek-ai/deepseek-v4-flash-0731",
+XKIRO_MODEL = os.getenv(
+    "XKIRO_MODEL",
+    "qwen/qwen3.8-omni-flash:free",
 )
 
 
-if not NVIDIA_API_KEY:
+if not XKIRO_API_KEY:
     raise ValueError(
-        "NVIDIA_API_KEY is not configured."
+        "XKIRO_API_KEY is not configured."
     )
-
-
 class IncidentAnalyzer:
 
     def __init__(
         self,
-        model: str = NVIDIA_MODEL,
+        model: str = XKIRO_MODEL,
         temperature: float = 0.0,
     ) -> None:
 
         self.llm = ChatOpenAI(
             model=model,
             temperature=temperature,
-            api_key=NVIDIA_API_KEY,
-            base_url=NVIDIA_BASE_URL,
+            api_key=XKIRO_API_KEY,
+            base_url=XKIRO_BASE_URL,
+            timeout=120,
+            max_retries=2,
         )
 
         self.structured_llm = (
@@ -49,6 +49,7 @@ class IncidentAnalyzer:
                 IncidentAnalysis
             )
         )
+
 
     async def analyze(
         self,
@@ -66,7 +67,7 @@ class IncidentAnalyzer:
 You are an SRE incident analysis system.
 
 Analyze the incident using ONLY the evidence provided below.
-  
+
 Your task is to:
 
 1. Identify the most likely root cause.
@@ -90,6 +91,9 @@ Important rules:
 - Do not generate shell commands.
 - The remediation plan is only a recommendation that must be reviewed
   and approved by a human before execution.
+- For a database connection pool exhaustion incident, use the simulator's
+  supported remediation action `increase_database_pool` with an integer
+  `pool_size` parameter.
 
 INCIDENT
 --------

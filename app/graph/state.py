@@ -34,4 +34,8 @@ class IncidentState(TypedDict, total=False):
     github_issue: dict[str, Any]
     slack_notification: dict[str, Any]
 
+    verification_status: str
+    verification_result: dict[str, Any]
+    post_remediation_metrics: dict[str, Any]
+    
     final_response: str

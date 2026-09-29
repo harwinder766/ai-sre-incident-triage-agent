@@ -10,7 +10,8 @@ from .nodes import(
     analyze_incident,
     request_approval,
     execute_external_actions,
-    execute_remediation_action
+    execute_remediation_action,
+    verify_remediation,
 )
 
 builder = StateGraph(IncidentState)
@@ -22,6 +23,7 @@ builder.add_node('analyze_incident', analyze_incident)
 builder.add_node('request_approval', request_approval)
 builder.add_node('execute_external_actions', execute_external_actions)
 builder.add_node('execute_remediation_action', execute_remediation_action)
+builder.add_node('verify_remediation', verify_remediation)
 builder.add_node('generate_final_response', generate_final_response)
 checkpointer = InMemorySaver()
 
@@ -31,10 +33,19 @@ builder.add_edge('classify_incident', 'investigate_incident')
 builder.add_edge('investigate_incident', 'analyze_incident')
 builder.add_edge('analyze_incident', 'request_approval')
 
-def route_after_approval(state: IncidentState)-> str:
-    if state.get("approval_reason") == "approved":
+def route_after_approval(state: IncidentState) -> str:
+
+    approval_status = state.get("approval_status")
+
+    if approval_status == "approved":
         return "approved"
-    return "rejected"
+
+    if approval_status == "rejected":
+        return "rejected"
+
+    raise ValueError(
+        f"Unexpected approval status: {approval_status}"
+    )
 
 builder.add_conditional_edges(
     "request_approval",
@@ -45,7 +56,8 @@ builder.add_conditional_edges(
     },
 )
 builder.add_edge("execute_external_actions", "execute_remediation_action")
-builder.add_edge("execute_remediation_action", "generate_final_response")
+builder.add_edge("execute_remediation_action", "verify_remediation")
+builder.add_edge("verify_remediation", "generate_final_response")
 builder.add_edge("generate_final_response",END,)
 
 graph = builder.compile(checkpointer=checkpointer)
