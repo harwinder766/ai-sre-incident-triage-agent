@@ -1,6 +1,8 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.analysis.schema import RemediationPlan
+
 from .models import Incident
 
 
@@ -14,6 +16,10 @@ class IncidentRepository:
         Create a new incident in the database.
         """
 
+        remediation = incident_data.get("remediation")
+        if isinstance(remediation, RemediationPlan):
+            remediation = remediation.model_dump_json()
+
         incident = Incident(
             incident_id=incident_data["incident_id"],
             service=incident_data["service"],
@@ -24,7 +30,7 @@ class IncidentRepository:
             investigation=incident_data.get("investigation"),
             root_cause=incident_data.get("root_cause"),
             confidence=incident_data.get("confidence"),
-            remediation=incident_data.get("remediation"),
+            remediation=remediation,
             status=incident_data.get("status", "open"),
         )
 

@@ -26,12 +26,28 @@ class PrometheusTool:
     ):
         self.base_url = base_url.rstrip("/")
         self._client: httpx.AsyncClient | None = None
+        self._client_loop: asyncio.AbstractEventLoop | None = None
 
-    def _get_client(self) -> httpx.AsyncClient:
+    async def _get_client(self) -> httpx.AsyncClient:
+        loop = asyncio.get_running_loop()
+
+        if self._client_loop is not loop:
+            if self._client is not None and self._client_loop is not None:
+                if self._client_loop.is_closed():
+                    self._client = None
+                else:
+                    await self._client.aclose()
+                self._client_loop = None
+            self._client_loop = loop
+
         if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(timeout=10.0)
 
         return self._client
+
+    @staticmethod
+    def _metric_prefix(service: str) -> str:
+        return service.replace("-", "_")
 
     async def close(self) -> None:
         """Close the shared HTTP client."""
@@ -39,6 +55,7 @@ class PrometheusTool:
         if self._client is not None:
             await self._client.aclose()
             self._client = None
+        self._client_loop = None
 
     async def __aenter__(self) -> "PrometheusTool":
         return self
@@ -54,7 +71,7 @@ class PrometheusTool:
         Execute a PromQL instant query.
         """
 
-        response = await self._get_client().get(
+        response = await (await self._get_client()).get(
             f"{self.base_url}/api/v1/query",
             params={"query": promql},
         )
@@ -78,8 +95,9 @@ class PrometheusTool:
         Get requests per second for a service.
         """
 
+        metric_prefix = self._metric_prefix(service)
         query = (
-            f'rate({service}_requests_total[1m])'
+            f'rate({metric_prefix}_requests_total[1m])'
         )
 
         results = await self.query(query)
@@ -99,12 +117,14 @@ class PrometheusTool:
         error rate = errors / requests
         """
 
+        metric_prefix = self._metric_prefix(service)
+
         error_query = (
-            f'rate({service}_errors_total[1m])'
+            f'rate({metric_prefix}_errors_total[1m])'
         )
 
         request_query = (
-            f'rate({service}_requests_total[1m])'
+            f'rate({metric_prefix}_requests_total[1m])'
         )
 
         error_results, request_results = await asyncio.gather(
@@ -144,12 +164,14 @@ class PrometheusTool:
             rate(_sum) / rate(_count)
         """
 
+        metric_prefix = self._metric_prefix(service)
+
         sum_query = (
-            f'rate({service}_request_duration_seconds_sum[1m])'
+            f'rate({metric_prefix}_request_duration_seconds_sum[1m])'
         )
 
         count_query = (
-            f'rate({service}_request_duration_seconds_count[1m])'
+            f'rate({metric_prefix}_request_duration_seconds_count[1m])'
         )
 
         sum_results, count_results = await asyncio.gather(

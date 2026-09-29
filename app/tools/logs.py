@@ -1,3 +1,4 @@
+import asyncio
 import os
 from typing import Any
 
@@ -30,8 +31,20 @@ class LogsTool:
     ):
         self.base_url = base_url.rstrip("/")
         self._client: httpx.AsyncClient | None = None
+        self._client_loop: asyncio.AbstractEventLoop | None = None
 
-    def _get_client(self) -> httpx.AsyncClient:
+    async def _get_client(self) -> httpx.AsyncClient:
+        loop = asyncio.get_running_loop()
+
+        if self._client_loop is not loop:
+            if self._client is not None and self._client_loop is not None:
+                if self._client_loop.is_closed():
+                    self._client = None
+                else:
+                    await self._client.aclose()
+                self._client_loop = None
+            self._client_loop = loop
+
         if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(
                 timeout=10.0
@@ -45,6 +58,7 @@ class LogsTool:
         if self._client is not None:
             await self._client.aclose()
             self._client = None
+        self._client_loop = None
 
     async def __aenter__(self) -> "LogsTool":
         return self
@@ -67,7 +81,7 @@ class LogsTool:
             {container="ai-sre-payment-api"}
         """
 
-        response = await self._get_client().get(
+        response = await (await self._get_client()).get(
             f"{self.base_url}/loki/api/v1/query_range",
             params={
                 "query": log_query,

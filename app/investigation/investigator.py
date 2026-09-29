@@ -16,6 +16,7 @@ class IncidentInvestigator:
         service: str,
         container_name: str,
         incident_message: str,
+        incident_error_rate: float = 0.0,
         log_limit: int = 50,
         commit_limit: int = 10,
     ) -> dict[str, Any]:
@@ -75,6 +76,16 @@ class IncidentInvestigator:
             rag_evidence = {
                 'status': 'unavailable',
                 'error': str(rag_evidence),
+            }
+
+        if (
+            isinstance(metrics, dict)
+            and incident_error_rate > 0
+            and metrics.get("error_rate", 0.0) == 0.0
+        ):
+            metrics = {
+                **metrics,
+                "error_rate": incident_error_rate,
             }
         
             

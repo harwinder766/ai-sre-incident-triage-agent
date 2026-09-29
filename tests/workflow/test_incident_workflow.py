@@ -1,5 +1,7 @@
 import pytest
 
+from langgraph.types import Command
+
 from app.graph.graph import graph
 
 
@@ -13,8 +15,25 @@ async def test_incident_workflow():
         "error_rate": 0.18,
     }
 
+    config = {
+        "configurable": {
+            "thread_id": "test-incident-workflow-001",
+        }
+    }
+
+    await graph.ainvoke(
+        initial_state,
+        config=config,
+    )
+
     result = await graph.ainvoke(
-        initial_state
+        Command(
+            resume={
+                "decision": "approve",
+                "reason": "Approved for workflow testing.",
+            }
+        ),
+        config=config,
     )
 
     assert result["category"] == "database"

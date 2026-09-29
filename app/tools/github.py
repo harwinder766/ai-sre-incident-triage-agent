@@ -1,3 +1,4 @@
+import asyncio
 import os
 from typing import Any
 
@@ -46,8 +47,20 @@ class GitHubTool:
             )
 
         self._client: httpx.AsyncClient | None = None
+        self._client_loop: asyncio.AbstractEventLoop | None = None
 
-    def _get_client(self) -> httpx.AsyncClient:
+    async def _get_client(self) -> httpx.AsyncClient:
+        loop = asyncio.get_running_loop()
+
+        if self._client_loop is not loop:
+            if self._client is not None and self._client_loop is not None:
+                if self._client_loop.is_closed():
+                    self._client = None
+                else:
+                    await self._client.aclose()
+                self._client_loop = None
+            self._client_loop = loop
+
         if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(
                 headers=self.headers,
@@ -62,6 +75,7 @@ class GitHubTool:
         if self._client is not None:
             await self._client.aclose()
             self._client = None
+        self._client_loop = None
 
     async def __aenter__(self) -> "GitHubTool":
         return self
@@ -93,7 +107,7 @@ class GitHubTool:
 
         self._validate_repository()
 
-        client = self._get_client()
+        client = await self._get_client()
 
         response = await client.get(
             f"{self.base_url}/repos/"
@@ -134,7 +148,7 @@ class GitHubTool:
             f"{query}"
         )
 
-        client = self._get_client()
+        client = await self._get_client()
 
         response = await client.get(
             f"{self.base_url}/search/issues",
@@ -168,7 +182,7 @@ class GitHubTool:
 
         self._validate_repository()
 
-        client = self._get_client()
+        client = await self._get_client()
 
         response = await client.get(
             f"{self.base_url}/repos/"
@@ -202,7 +216,7 @@ class GitHubTool:
     
         self._validate_repository()
     
-        client = self._get_client()
+        client = await self._get_client()
     
         payload: dict[str, Any] = {
             "title": title,

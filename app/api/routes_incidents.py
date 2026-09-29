@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 import asyncio
+from uuid import uuid4
 
 from app.graph.graph import graph
 from app.db.database import get_db
@@ -36,7 +37,13 @@ async def create_incident(incident: IncidentRequest, db: Session =Depends(get_db
     }
 
     # Run the LangGraph workflow
-    result = await graph.ainvoke(initial_state)
+    config = {
+        "configurable": {
+            "thread_id": f"incident-{incident.incident_id}-{uuid4().hex}",
+        }
+    }
+
+    result = await graph.ainvoke(initial_state, config=config)
 
     repository = IncidentRepository(db)
 
@@ -76,4 +83,3 @@ def get_incident(
         "created_at": incident.created_at,
         "updated_at": incident.updated_at,
     }
-

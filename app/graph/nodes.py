@@ -103,7 +103,8 @@ async def investigate_incident(
     result = await incident_investigator.investigate(
         service=service,
         container_name=container_name,
-        incident_message=state["message"]
+        incident_message=state["message"],
+        incident_error_rate=state.get("error_rate", 0.0),
     )
 
     metrics = result.get("metrics", {})
