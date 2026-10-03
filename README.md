@@ -212,6 +212,7 @@ ai-sre-incident-triage-agent/
 │   └── tools/                  # Prometheus, Loki, GitHub, Slack, remediation
 ├── dashboard/streamlit_app.py
 ├── docker/                     # Compose and observability configuration
+├── docs/images/                # Images of the dashboard
 ├── scripts/
 ├── simulator/services/payment_api/
 ├── tests/
