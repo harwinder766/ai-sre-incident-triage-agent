@@ -67,8 +67,45 @@ class Incident(Base):
         nullable=True,
     )
 
+    reasoning: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    supporting_evidence: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    expected_impact: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    risks: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
     # Remediation
     remediation: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    # Workflow approval
+    thread_id: Mapped[str | None] = mapped_column(
+        String(200),
+        nullable=True,
+        index=True,
+    )
+
+    approval_status: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+    )
+
+    approval_reason: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )

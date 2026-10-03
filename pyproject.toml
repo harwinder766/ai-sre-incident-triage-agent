@@ -11,6 +11,8 @@ dependencies = [
     "langchain",
     "langchain-text-splitters",
     "langgraph",
+    "langgraph-checkpoint-postgres",
+    "psycopg[binary]",
     "faiss-cpu",
 ]
 

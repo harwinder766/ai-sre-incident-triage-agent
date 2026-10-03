@@ -2,24 +2,9 @@ import asyncio
 
 from langgraph.types import Command
 
-from app.graph.graph import graph
-from app.adapters.simulator.payment_api import PaymentAPIAdapter
+from app.main import app
+from app.adapters.simulator import register_simulator_adapters
 from app.tools.remediation import remediation_tool
-
-
-def register_simulator_adapters():
-    """
-    Register remediation adapters required by the simulator.
-    """
-
-    payment_api_adapter = PaymentAPIAdapter(
-        base_url="http://localhost:8001"
-    )
-
-    remediation_tool.register_adapter(
-        action="increase_database_pool",
-        adapter=payment_api_adapter,
-    )
 
 
 async def run_remediation_workflow():
@@ -80,61 +65,64 @@ async def run_remediation_workflow():
 
     print("\n🔹 Starting remediation workflow...")
 
-    await graph.ainvoke(
-        incident,
-        config=config,
-    )
+    async with app.router.lifespan_context(app):
+        graph = app.state.graph
 
-    # ---------------------------------------------------------
-    # 5. Check that workflow stopped at approval
-    # ---------------------------------------------------------
+        await graph.ainvoke(
+            incident,
+            config=config,
+        )
 
-    state = graph.get_state(config)
+        # ---------------------------------------------------------
+        # 5. Check that workflow stopped at approval
+        # ---------------------------------------------------------
 
-    assert state is not None
+        state = await graph.aget_state(config)
 
-    print("\n🔹 Workflow reached approval step.")
+        assert state is not None
 
-    print("Next node:", state.next)
+        print("\n🔹 Workflow reached approval step.")
 
-    assert state.next == ("request_approval",)
+        print("Next node:", state.next)
 
-    # ---------------------------------------------------------
-    # 6. Read approval request
-    # ---------------------------------------------------------
+        assert state.next == ("request_approval",)
 
-    approval_request = state.tasks[0].interrupts[0].value
+        # ---------------------------------------------------------
+        # 6. Read approval request
+        # ---------------------------------------------------------
 
-    print("\n🔹 Approval request:")
-    print(approval_request)
+        approval_request = state.tasks[0].interrupts[0].value
 
-    assert approval_request["incident_id"] == "TEST-REMEDIATION-001"
-    assert approval_request["service"] == "payment-api"
+        print("\n🔹 Approval request:")
+        print(approval_request)
 
-    assert "root_cause" in approval_request
-    assert "remediation" in approval_request
+        assert approval_request["incident_id"] == "TEST-REMEDIATION-001"
+        assert approval_request["service"] == "payment-api"
 
-    # ---------------------------------------------------------
-    # 7. Approve remediation
-    # ---------------------------------------------------------
+        assert "root_cause" in approval_request
+        assert "remediation" in approval_request
 
-    print("\n🔹 Approving remediation...")
+        # ---------------------------------------------------------
+        # 7. Approve remediation
+        # ---------------------------------------------------------
 
-    await graph.ainvoke(
-        Command(
-            resume={
-                "decision": "approve",
-                "reason": "Approved for workflow testing.",
-            }
-        ),
-        config=config,
-    )
+        print("\n🔹 Approving remediation...")
 
-    # ---------------------------------------------------------
-    # 8. Get final state
-    # ---------------------------------------------------------
+        await graph.ainvoke(
+            Command(
+                resume={
+                    "decision": "approve",
+                    "reason": "Approved for workflow testing.",
+                }
+            ),
+            config=config,
+        )
 
-    final_state = graph.get_state(config)
+        # ---------------------------------------------------------
+        # 8. Get final state
+        # ---------------------------------------------------------
+
+        final_state = await graph.aget_state(config)
 
     assert final_state is not None
     

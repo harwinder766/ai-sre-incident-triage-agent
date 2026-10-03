@@ -2,7 +2,7 @@ import pytest
 
 from langgraph.types import Command
 
-from app.graph.graph import graph
+from app.main import app
 
 
 @pytest.mark.asyncio
@@ -21,20 +21,23 @@ async def test_incident_workflow():
         }
     }
 
-    await graph.ainvoke(
-        initial_state,
-        config=config,
-    )
+    async with app.router.lifespan_context(app):
+        graph = app.state.graph
 
-    result = await graph.ainvoke(
-        Command(
-            resume={
-                "decision": "approve",
-                "reason": "Approved for workflow testing.",
-            }
-        ),
-        config=config,
-    )
+        await graph.ainvoke(
+            initial_state,
+            config=config,
+        )
+
+        result = await graph.ainvoke(
+            Command(
+                resume={
+                    "decision": "approve",
+                    "reason": "Approved for workflow testing.",
+                }
+            ),
+            config=config,
+        )
 
     assert result["category"] == "database"
 

@@ -47,6 +47,13 @@ class PrometheusTool:
 
     @staticmethod
     def _metric_prefix(service: str) -> str:
+        service_metric_prefixes = {
+            "payment-api": "payment",
+        }
+
+        if service in service_metric_prefixes:
+            return service_metric_prefixes[service]
+
         return service.replace("-", "_")
 
     async def close(self) -> None:

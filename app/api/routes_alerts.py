@@ -1,13 +1,12 @@
 import hashlib
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 import asyncio
 
 from app.db.database import get_db
 from app.db.repository import IncidentRepository
-from app.graph.graph import graph
 
 
 router = APIRouter(
@@ -64,6 +63,7 @@ def map_alert_severity(alert_severity: str | None) -> str:
 @router.post("/")
 async def receive_alert(
     payload: dict[str, Any],
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """
@@ -192,7 +192,15 @@ async def receive_alert(
         }
 
         # Process through LangGraph
-        result = await graph.ainvoke(initial_state)
+        thread_id = incident_id
+        result = await request.app.state.graph.ainvoke(
+            initial_state,
+            config={
+                "configurable": {
+                    "thread_id": thread_id,
+                }
+            },
+        )
 
         # Alertmanager is the source of the alert severity,
         # so preserve that severity instead of relying only
@@ -200,6 +208,7 @@ async def receive_alert(
         result["severity"] = map_alert_severity(
             alert_severity
         )
+        result["thread_id"] = thread_id
 
         # Store the incident
         repository.create_incident(result)

@@ -1,3 +1,5 @@
+import json
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -30,7 +32,21 @@ class IncidentRepository:
             investigation=incident_data.get("investigation"),
             root_cause=incident_data.get("root_cause"),
             confidence=incident_data.get("confidence"),
+            reasoning=incident_data.get("reasoning"),
+            supporting_evidence=json.dumps(
+                incident_data.get("supporting_evidence", [])
+            ),
+            expected_impact=incident_data.get("expected_impact"),
+            risks=json.dumps(
+                incident_data.get("risks", [])
+            ),
             remediation=remediation,
+            thread_id=incident_data.get("thread_id"),
+            approval_status=incident_data.get(
+                "approval_status",
+                "pending",
+            ),
+            approval_reason=incident_data.get("approval_reason"),
             status=incident_data.get("status", "open"),
         )
 
