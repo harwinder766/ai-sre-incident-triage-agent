@@ -224,10 +224,9 @@ ai-sre-incident-triage-agent/
 
 - Python 3.11 or newer
 - Docker Desktop with Docker Compose
-- An LLM API key and compatible endpoint
+- An XKIRO API key for structured LLM-based incident analysis
 - GitHub repository settings if GitHub investigation or issue creation is used
 - Slack webhook settings if Slack notification is used
-
 ## Configuration
 
 Copy the example file:
@@ -311,7 +310,13 @@ http://host.docker.internal:8000/api/v1/alerts
 
 ## Dashboard
 
-[Dashboard screenshot can be added here]
+### Incident Overview
+
+![AI-SRE Incident Dashboard](docs/images/dashboard-overview.png)
+
+### Approval, Remediation and Verification
+
+![Incident remediation and verification](docs/images/incident-remediation.png)
 
 The Streamlit dashboard reads incident summaries and details from FastAPI. It displays current investigation metrics, logs, recent commits, analysis, approval state, execution state, and verification state when those values are available.
 
@@ -340,3 +345,21 @@ Integration and workflow tests may require PostgreSQL, local observability servi
 - Prometheus, Loki, GitHub, Slack, and the configured LLM endpoint are external dependencies for their respective paths.
 - The dashboard is an HTTP client of FastAPI; it does not directly access the database or checkpoints.
 - The project is an educational and portfolio implementation, not a claim of production readiness.
+
+## Future Improvements
+
+- **Production-grade remediation:** Extend the adapter system to support controlled Kubernetes, cloud, or infrastructure remediation instead of only the local payment-service simulator.
+
+- **More incident types:** Support additional failure scenarios such as high latency, service unavailability, database failures, and resource exhaustion.
+
+- **Improved incident correlation:** Correlate related alerts and group multiple alerts into a single incident to reduce duplicate investigations.
+
+- **Richer observability:** Add traces and distributed tracing context alongside metrics and logs for deeper root-cause analysis.
+
+- **More advanced RAG:** Expand the knowledge base with historical incidents, runbooks, and postmortems, with better retrieval and evaluation of retrieved context.
+
+- **Automated evaluation:** Add evaluation datasets and metrics for measuring classification accuracy, root-cause analysis quality, retrieval quality, and remediation recommendations.
+
+- **Production deployment:** Add CI/CD, containerized application deployment, secrets management, monitoring, and production-grade infrastructure configuration.
+
+- **Scalable workflow execution:** Move toward distributed task execution and stronger fault tolerance for handling multiple incidents concurrently.
