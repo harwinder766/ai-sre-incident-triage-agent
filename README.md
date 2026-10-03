@@ -211,7 +211,6 @@ ai-sre-incident-triage-agent/
 │   ├── rag/                    # Ingestion and hybrid retrieval
 │   └── tools/                  # Prometheus, Loki, GitHub, Slack, remediation
 ├── dashboard/streamlit_app.py
-├── data/chroma/
 ├── docker/                     # Compose and observability configuration
 ├── scripts/
 ├── simulator/services/payment_api/
